@@ -1,0 +1,89 @@
+<template>
+  <div>
+    上传图片：
+    <input type="file" @change="uploadfile" />
+    <img style="width:200px;height:100px" :src="searchImg" alt />
+   <Button type="error" @click="btnInp">提交</Button>
+  </div>
+</template>
+<script>
+import * as qiniu from "qiniu-js";
+export default {
+  data() {
+    return {
+      searchImg: "",
+      uploaderr: true,
+      file:null
+    };
+  },
+  methods: {
+    btnInp(){
+      this.uploadQiniu(this.file)
+    },
+    uploadfile(e) {
+      const file = e.target.files[0];
+      this.file = file
+      let reader = new FileReader();
+      let URL = window.URL || window.webkitURL || window.mozURL
+      reader.readAsDataURL(file)
+      reader.onload = (e)=>{
+        // console.log(e.target.result)
+        this.searchImg = e.target.result 
+      }
+      
+    },
+    uploadQiniu(file){
+      if (!["jpg", "jpeg", "png"].includes(file.name.split(".")[1])) {
+        this.$Message.info('格式错误');
+      } else {
+        this.axios.get("/up/token").then((res) => {
+          const key = "security/" + Date.now() + ".jpg";
+          const token = res.data;
+          const putExtra = {
+            fname: "",
+            params: {},
+            mimeType: ["image/png", "image/jpeg", "image/gif"],
+          };
+          const config = {
+            useCdnDomain: true,
+            region: qiniu.region.z2,
+          };
+          const options = {
+            quality: 0.92,
+            maxWidth: 1000,
+            naxHeight: 500,
+            noCompressIfLarger: true,
+          };
+          // 图片压缩后上传
+          qiniu.compressImage(file, options).then((data) => {
+            const observable = qiniu.upload(
+              data.dist,
+              key,
+              token,
+              putExtra,
+              config
+            );
+            const subscription = observable.subscribe({
+              next: (result) => {
+                // 主要用来展示进度
+                console.warn(result);
+              },
+              error: (err) => {},
+              complete: (res) => {
+                // this.searchImg = key
+                console.log(res);
+                var fileFullPathName =
+                  "http://qegy3ynf9.bkt.clouddn.com/" + res.key;
+                console.log(
+                  "图片上传成功,最终保存的访问路径为：" + fileFullPathName
+                );
+              },
+            });
+            //  subscription.unsubscribe(); //取校上传
+          });
+        });
+      }
+    }
+  },
+};
+</script>
